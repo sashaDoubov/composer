@@ -1293,7 +1293,7 @@ class State(Serializable):
                 dataloader_len = None
         except (TypeError, NotImplementedError):
             dataloader_len = None
-        if dataloader_len is not None and num_batches >= 0 and int(num_batches) > dataloader_len:
+        if dataloader_len is not None and int(num_batches) >= 0 and int(num_batches) > dataloader_len:
             warnings.warn((f'DataloaderNumBatchesWarning: The dataloader_len ({int(num_batches)}) '
                            f'is greater than the length (i.e. number of batches) of the dataloader, which is '
                            f'{dataloader_len}. State.dataloader_len is thus being set to {dataloader_len}.'))
