@@ -478,7 +478,7 @@ def load_sharded_checkpoint(
             # 2. Optionally load optimizer
             if not load_weights_only:
                 log.info('Load optimizer')
-                optim_state = load_sharded_optimizer_state_dict(model_state_dict=state.state_dict()['model'],
+                optim_state = load_sharded_optimizer_state_dict(model_state_dict=state.get_model_state_dict(),
                                                                 optimizer_key='optimizers',
                                                                 storage_reader=storage_reader)
                 log.debug('Strip _pgidx from optimizer state dict keys')
