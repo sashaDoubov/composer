@@ -17,6 +17,7 @@ from tqdm import tqdm
 from composer.core import DataSpec
 from composer.core.data_spec import _default_split_batch, _split_list
 from composer.utils import MissingConditionalImportError, dist, get_file
+import math
 
 if TYPE_CHECKING:
     import transformers
@@ -175,6 +176,13 @@ class InContextLearningQATaskDataset(Dataset):
         self.encoded_dataset = self._prep_examples(num_fewshot, prompt_string, example_delimiter,
                                                    continuation_delimiter, question_prelimiter, fewshot_rng,
                                                    cot_delimiter)
+        lengths = []
+        for sample in self.encoded_dataset:
+            preamble, context, aliases = (sample['preamble'], sample['context'], sample['aliases'])
+            context_enc = preamble['input_ids'] + context['input_ids']
+            lengths.append(len(context_enc))
+        print(dataset_uri)
+        print(f"{max(lengths)=} average: {sum(lengths) / len(lengths)}")
 
     def _format_prompt_and_fewshot(self, num_fewshot: int, prompt_string: str, example_delimiter: str,
                                    continuation_delimiter: str, question_prelimiter: str, cot_delimiter: str,
@@ -399,6 +407,16 @@ class InContextLearningLMTaskDataset(Dataset):
 
         self.encoded_dataset = self.prep_examples(num_fewshot, prompt_string, example_delimiter, continuation_delimiter,
                                                   fewshot_rng)
+        lengths = []
+        for data_pair in self.encoded_dataset:
+            preamble, context, continuation = (data_pair['preamble'], data_pair['context'], data_pair['continuation'])
+
+            context_enc = preamble['input_ids'] + context['input_ids']
+            continuation_enc = continuation['input_ids']
+
+            lengths.append(len(context_enc) + len(continuation_enc))
+        print(dataset_uri)
+        print(f"{max(lengths)=} average: {sum(lengths) / len(lengths)}")
 
     def prep_examples(self, num_fewshot: int, prompt_string: str, example_delimiter: str, continuation_delimiter: str,
                       fewshot_rng: random.Random):
@@ -566,6 +584,19 @@ class InContextLearningMultipleChoiceTaskDataset(Dataset):
 
         self.encoded_dataset = self.prep_examples(num_fewshot, prompt_string, example_delimiter, continuation_delimiter,
                                                   fewshot_rng)
+        lengths = []
+        for data_pair in self.encoded_dataset:
+
+            preamble, context, choices, gold_idx = (data_pair['preamble'], data_pair['query'], data_pair['choices'],
+                                                                data_pair['gold_idx'])
+
+            for choice in choices:
+                context_enc = preamble['input_ids'] + context['input_ids']
+                continuation_enc = choice['input_ids']
+
+                lengths.append(len(context_enc) + len(continuation_enc))
+        print(dataset_uri)
+        print(f"{max(lengths)=} average: {sum(lengths) / len(lengths)}")
 
     def prep_examples(self, num_fewshot: int, prompt_string: str, example_delimiter: str, continuation_delimiter: str,
                       fewshot_rng: random.Random):
@@ -795,6 +826,20 @@ class InContextLearningSchemaTaskDataset(InContextLearningMultipleChoiceTaskData
 
         self.encoded_dataset = self.prep_examples(num_fewshot, prompt_string, example_delimiter, continuation_delimiter,
                                                   fewshot_rng)
+
+        lengths = []
+        for data_pair in self.encoded_dataset:
+
+            preamble, context_options, continuation, gold_idx = (data_pair['preamble'], data_pair['context_options'],
+                                                                 data_pair['continuation'], data_pair['gold_idx'])
+
+            for ctxt in context_options:
+                context_enc = preamble['input_ids'] + ctxt['input_ids']
+                continuation_enc = continuation['input_ids']
+
+                lengths.append(len(context_enc) + len(continuation_enc))
+        print(dataset_uri)
+        print(f"{max(lengths)=} average: {sum(lengths) / len(lengths)}")
 
     def prep_examples(self, num_fewshot: int, prompt_string: str, example_delimiter: str, continuation_delimiter: str,
                       fewshot_rng: random.Random):
