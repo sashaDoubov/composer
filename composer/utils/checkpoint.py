@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from composer.core.state import State
     from composer.loggers import Logger, LoggerDestination
 
+
 log = logging.getLogger(__name__)
 
 __all__ = ['load_checkpoint', 'save_checkpoint', 'download_checkpoint']
@@ -296,6 +297,13 @@ def load_checkpoint(
 
 
 def _get_module_name_mapping(model: torch.nn.Module) -> dict[str, str]:
+
+    try:
+        import megablocks
+        is_megablocks_imported = True
+    except ModuleNotFoundError:
+        is_megablocks_imported = False
+
     module_name_mapping = {}
     world_size = dist.get_world_size()
     for module_name, module in model.named_modules():
@@ -306,6 +314,15 @@ def _get_module_name_mapping(model: torch.nn.Module) -> dict[str, str]:
                 custom_process_group_size = world_size // process_group_size
                 process_group_index = dist.get_global_rank() % custom_process_group_size
                 new_module_name = module_name.replace('_fsdp_wrapped_module.', '')
+
+                if is_megablocks_imported:
+
+                    import megablocks
+                    import version
+
+                    if version.parse(megablocks.__version__) >= version.parse('0.3'):
+                        new_module_name = new_module_name.replace("ffn.mlp", "ffn.experts.mlp")
+
                 for k in module.state_dict().keys():
                     full_module_name = '.'.join((new_module_name, k))
                     module_name_mapping[full_module_name] = full_module_name + f'_pgidx{process_group_index}'
