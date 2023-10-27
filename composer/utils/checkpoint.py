@@ -317,10 +317,10 @@ def _get_module_name_mapping(model: torch.nn.Module) -> dict[str, str]:
 
                 if is_megablocks_imported:
 
-                    import megablocks
                     from packaging import version
+                    from importlib.metadata import version as get_version
 
-                    if version.parse(megablocks.__version__) >= version.parse('0.3'):
+                    if version.parse(get_version("megablocks")) >= version.parse('0.3'):
                         new_module_name = new_module_name.replace("ffn.mlp", "ffn.experts.mlp")
 
                 for k in module.state_dict().keys():
