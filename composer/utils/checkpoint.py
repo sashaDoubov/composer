@@ -1093,6 +1093,8 @@ class RenameLoadPlanner(DefaultLoadPlanner):
             log.debug('reassign model state dict')
             state_dict['state']['model'] = model_state_dict
 
+            print(f"{state_dict['state']['model'].keys()=}")
+
         log.debug('Load sharded optimizer state dict')
         if self.flatten_sharded_tensors:
             state_dict = _flatten_sharded_tensors(state_dict)
@@ -1101,7 +1103,6 @@ class RenameLoadPlanner(DefaultLoadPlanner):
         if self.flatten_state_dict:
             state_dict, self.mappings = flatten_state_dict(state_dict)
 
-        print(f"{state_dict['state']['model'].keys()=}")
 
         log.debug('Set ptrs')
         self.state_dict = state_dict
