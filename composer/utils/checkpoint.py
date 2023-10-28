@@ -1101,7 +1101,7 @@ class RenameLoadPlanner(DefaultLoadPlanner):
         if self.flatten_state_dict:
             state_dict, self.mappings = flatten_state_dict(state_dict)
 
-        print(f"{self.state_dict['state']['model'].keys()=}")
+        print(f"{state_dict['state']['model'].keys()=}")
 
         log.debug('Set ptrs')
         self.state_dict = state_dict
