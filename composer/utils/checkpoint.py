@@ -296,7 +296,6 @@ def load_checkpoint(
 
 
 def _get_module_name_mapping(model: torch.nn.Module) -> dict[str, str]:
-
     module_name_mapping = {}
     world_size = dist.get_world_size()
     for module_name, module in model.named_modules():
@@ -307,9 +306,6 @@ def _get_module_name_mapping(model: torch.nn.Module) -> dict[str, str]:
                 custom_process_group_size = world_size // process_group_size
                 process_group_index = dist.get_global_rank() % custom_process_group_size
                 new_module_name = module_name.replace('_fsdp_wrapped_module.', '')
-                print(f"{new_module_name}")
-
-
 
                 for k in module.state_dict().keys():
                     full_module_name = '.'.join((new_module_name, k))
