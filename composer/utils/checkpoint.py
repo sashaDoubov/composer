@@ -30,7 +30,6 @@ if TYPE_CHECKING:
     from composer.core.state import State
     from composer.loggers import Logger, LoggerDestination
 
-
 log = logging.getLogger(__name__)
 
 __all__ = ['load_checkpoint', 'save_checkpoint', 'download_checkpoint']
@@ -298,12 +297,6 @@ def load_checkpoint(
 
 def _get_module_name_mapping(model: torch.nn.Module) -> dict[str, str]:
 
-    try:
-        import megablocks
-        is_megablocks_imported = True
-    except ModuleNotFoundError:
-        is_megablocks_imported = False
-
     module_name_mapping = {}
     world_size = dist.get_world_size()
     for module_name, module in model.named_modules():
@@ -321,17 +314,8 @@ def _get_module_name_mapping(model: torch.nn.Module) -> dict[str, str]:
                 for k in module.state_dict().keys():
                     full_module_name = '.'.join((new_module_name, k))
 
-                    value_module_name = full_module_name
-
-                    if is_megablocks_imported:
-
-                        from packaging import version
-                        from importlib.metadata import version as get_version
-
-                        # if version.parse(get_version("megablocks")) >= version.parse('0.3'):
-                            # value_module_name = value_module_name.
-
-                    module_name_mapping[full_module_name] = full_module_name.replace("ffn.experts.mlp", "ffn.mlp") + f'_pgidx{process_group_index}'
+                    # added replace for bwd compatibility
+                    module_name_mapping[full_module_name] = full_module_name.replace("ffn.experts.mlp", "ffn.mlp")  + f'_pgidx{process_group_index}'
 
     return module_name_mapping
 
@@ -486,8 +470,6 @@ def load_sharded_checkpoint(
                     ignore_keys = glob_filter(ignore_keys)
                 # Call function to modify state_dict
                 ignore_keys(model_state_dict)
-
-            print(model_state_dict['state']['model'].keys())
 
             dist_cp.load_state_dict(model_state_dict, storage_reader, planner=RenameLoadPlanner(state.model))
 
@@ -1079,8 +1061,6 @@ class RenameLoadPlanner(DefaultLoadPlanner):
 
         self.original_state_dict = state_dict
 
-        print(f"{self.original_state_dict['state']['model'].keys()=}")
-
         log.debug(f'Copy state dict')
         state_dict = { k: v for k, v in self.original_state_dict.items() }
         state_dict['state'] = { k: v for k, v in self.original_state_dict['state'].items() if k != 'model' }
@@ -1095,8 +1075,6 @@ class RenameLoadPlanner(DefaultLoadPlanner):
             log.debug('reassign model state dict')
             state_dict['state']['model'] = model_state_dict
 
-            print(f"{state_dict['state']['model'].keys()=}")
-
         log.debug('Load sharded optimizer state dict')
         if self.flatten_sharded_tensors:
             state_dict = _flatten_sharded_tensors(state_dict)
@@ -1104,7 +1082,6 @@ class RenameLoadPlanner(DefaultLoadPlanner):
         log.debug('Flatten state dict')
         if self.flatten_state_dict:
             state_dict, self.mappings = flatten_state_dict(state_dict)
-
 
         log.debug('Set ptrs')
         self.state_dict = state_dict
