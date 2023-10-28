@@ -314,6 +314,7 @@ def _get_module_name_mapping(model: torch.nn.Module) -> dict[str, str]:
                 custom_process_group_size = world_size // process_group_size
                 process_group_index = dist.get_global_rank() % custom_process_group_size
                 new_module_name = module_name.replace('_fsdp_wrapped_module.', '')
+                print(f"{new_module_name}")
 
                 if is_megablocks_imported:
 
@@ -325,6 +326,7 @@ def _get_module_name_mapping(model: torch.nn.Module) -> dict[str, str]:
 
                 for k in module.state_dict().keys():
                     full_module_name = '.'.join((new_module_name, k))
+                    print(f"{full_module_name=}")
                     module_name_mapping[full_module_name] = full_module_name + f'_pgidx{process_group_index}'
     return module_name_mapping
 
