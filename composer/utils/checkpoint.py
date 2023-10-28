@@ -331,7 +331,7 @@ def _get_module_name_mapping(model: torch.nn.Module) -> dict[str, str]:
                         if version.parse(get_version("megablocks")) >= version.parse('0.3'):
                             value_module_name = value_module_name.replace("ffn.experts.mlp", "ffn.mlp")
 
-                    module_name_mapping[value_module_name] = full_module_name + f'_pgidx{process_group_index}'
+                    module_name_mapping[full_module_name] = value_module_name + f'_pgidx{process_group_index}'
 
     return module_name_mapping
 
