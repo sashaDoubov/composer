@@ -487,6 +487,8 @@ def load_sharded_checkpoint(
                 # Call function to modify state_dict
                 ignore_keys(model_state_dict)
 
+            print(model_state_dict.keys())
+
             dist_cp.load_state_dict(model_state_dict, storage_reader, planner=RenameLoadPlanner(state.model))
 
             state.load_state_dict(
