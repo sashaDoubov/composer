@@ -316,18 +316,23 @@ def _get_module_name_mapping(model: torch.nn.Module) -> dict[str, str]:
                 new_module_name = module_name.replace('_fsdp_wrapped_module.', '')
                 print(f"{new_module_name}")
 
-                if is_megablocks_imported:
 
-                    from packaging import version
-                    from importlib.metadata import version as get_version
-
-                    if version.parse(get_version("megablocks")) >= version.parse('0.3'):
-                        new_module_name = new_module_name.replace("ffn.mlp", "ffn.experts.mlp")
 
                 for k in module.state_dict().keys():
                     full_module_name = '.'.join((new_module_name, k))
-                    print(f"{full_module_name=}")
-                    module_name_mapping[full_module_name] = full_module_name + f'_pgidx{process_group_index}'
+
+                    value_module_name = full_module_name
+
+                    if is_megablocks_imported:
+
+                        from packaging import version
+                        from importlib.metadata import version as get_version
+
+                        if version.parse(get_version("megablocks")) >= version.parse('0.3'):
+                            value_module_name = value_module_name.replace("ffn.experts.mlp", "ffn.mlp")
+
+                    module_name_mapping[full_module_name] = value_module_name + f'_pgidx{process_group_index}'
+
     return module_name_mapping
 
 
