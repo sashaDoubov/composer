@@ -1227,8 +1227,6 @@ def load_sharded_optimizer_state_dict_with_logs(
     log.debug(f'Read metadata')
     metadata = storage_reader.read_metadata()
 
-    print(metadata)
-
     log.debug('Get 2d Layout')
     layout_specs, dp_pg = _get_state_dict_2d_layout(model_state_dict)
     dp_pg_device_type = torch.distributed.distributed_c10d._get_pg_default_device(dp_pg).type
