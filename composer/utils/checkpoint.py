@@ -1141,6 +1141,7 @@ class RenameLoadPlanner(DefaultLoadPlanner):
             flatten_sharded_tensors: See parent class.
         """
         self.name_conversion_dict, self.pg_world_size = _get_module_name_mapping_load(model)
+        assert self.pg_world_size != 1
         super().__init__(flatten_state_dict, flatten_sharded_tensors)
 
     def set_up_planner(
