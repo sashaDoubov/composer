@@ -495,8 +495,8 @@ def load_sharded_checkpoint(
                 optim_state_dict = optim_state['optimizers']['DecoupledLionW']['state']
                 log.debug('Loop over optimizer state dict keys')
                 for key in list(optim_state_dict.keys()):
-                    log.debug(f'Stripping {local_idx} from {key=}')
-                    optim_state_dict[key.replace(local_idx, '')] = optim_state_dict[key]
+                    log.debug(f'Stripping {local_idx} from {key=} and replacing ffn.mlp')
+                    optim_state_dict[key.replace(local_idx, '').replace('ffn.mlp', 'ffn.experts.mlp')] = optim_state_dict[key]
                     if '_pgidx' in key:
                         del optim_state_dict[key]
                 log.debug('Load optimizer state dict')
