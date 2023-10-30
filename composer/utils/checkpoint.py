@@ -295,7 +295,7 @@ def load_checkpoint(
     return rng_state_dicts
 
 
-def _get_module_name_mapping(model: torch.nn.Module) -> dict[str, str]:
+def _get_module_name_mapping(model: torch.nn.Module, loading: bool) -> dict[str, str]:
     module_name_mapping = {}
     world_size = dist.get_world_size()
     for module_name, module in model.named_modules():
@@ -308,8 +308,12 @@ def _get_module_name_mapping(model: torch.nn.Module) -> dict[str, str]:
                 new_module_name = module_name.replace('_fsdp_wrapped_module.', '')
                 for k in module.state_dict().keys():
                     full_module_name = '.'.join((new_module_name, k))
+
                     # added replace for bwd compatibility
-                    module_name_mapping[full_module_name] = full_module_name.replace("ffn.experts.mlp", "ffn.mlp")  + f'_pgidx{process_group_index}'
+                    updated_module_name = full_module_name
+                    if loading:
+                        updated_module_name = updated_module_name.replace("ffn.experts.mlp", "ffn.mlp")
+                    module_name_mapping[full_module_name] = updated_module_name  + f'_pgidx{process_group_index}'
 
     return module_name_mapping
 
@@ -1030,7 +1034,7 @@ class RenameLoadPlanner(DefaultLoadPlanner):
             flatten_state_dict: See parent class.
             flatten_sharded_tensors: See parent class.
         """
-        self.name_conversion_dict = _get_module_name_mapping(model)
+        self.name_conversion_dict = _get_module_name_mapping(model, loading=True)
         super().__init__(flatten_state_dict, flatten_sharded_tensors)
 
     def set_up_planner(
@@ -1107,7 +1111,7 @@ class RenameSavePlanner(DefaultSavePlanner):
             flatten_sharded_tensors: See parent class.
             dedup_replicated_tensors: See parent class.
         """
-        self.name_conversion_dict = _get_module_name_mapping(model)
+        self.name_conversion_dict = _get_module_name_mapping(model, loading=False)
         super().__init__(
             flatten_state_dict,
             flatten_sharded_tensors,
