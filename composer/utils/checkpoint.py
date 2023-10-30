@@ -483,6 +483,7 @@ def load_sharded_checkpoint(
             if not load_weights_only:
                 log.info('Load optimizer')
                 state_dict = state.state_dict()['model']
+                print(f"{list(state_dict.keys())=}")
                 log.debug('Fetched state dict')
                 # print(state_dict.keys())
                 # print(state_dict)
@@ -493,6 +494,9 @@ def load_sharded_checkpoint(
                 local_idx = f'_pgidx{dist.get_local_rank()}'
                 log.debug('Get ptr to optimizer state dict')
                 optim_state_dict = optim_state['optimizers']['DecoupledLionW']['state']
+
+                print(f"{list(optim_state_dict.keys())=}")
+
                 log.debug('Loop over optimizer state dict keys')
                 for key in list(optim_state_dict.keys()):
                     log.debug(f'Stripping {local_idx} from {key=} and replacing ffn.mlp')
