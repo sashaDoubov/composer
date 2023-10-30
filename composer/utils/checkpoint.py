@@ -508,10 +508,8 @@ def load_sharded_checkpoint(
                     if '_pgidx' in key or 'ffn.mlp' in key:
                         del optim_state_dict[key]
 
-
-                print(f"{list(state.state_dict()['model'].keys())=}")
-                print(f"{list(optim_state_dict.keys())=}")
                 log.debug('Load optimizer state dict')
+                print(f"new dict: {list(optim_state['optimizers']['DecoupledLionW']['state'].keys())=}")
                 state.load_optim_state(optim_state)
 
         # 3. Optionally load RNG
