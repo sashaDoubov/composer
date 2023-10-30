@@ -295,6 +295,25 @@ def load_checkpoint(
     return rng_state_dicts
 
 
+
+def _get_module_name_mapping_load(model: torch.nn.Module) -> tuple[dict[str, str], int]:
+    module_name_mapping = {}
+    world_size = dist.get_world_size()
+    pg_world_size = 1
+    for module_name, module in model.named_modules():
+        if hasattr(module, 'process_group'):
+            process_group = module.process_group
+            process_group_size = torch.distributed.get_world_size(process_group)
+            if process_group_size != world_size:
+                custom_process_group_size = world_size // process_group_size
+                process_group_index = dist.get_global_rank() % custom_process_group_size
+                pg_world_size = max(pg_world_size, process_group_index + 1)
+                new_module_name = module_name.replace('_fsdp_wrapped_module.', '')
+                for k in module.state_dict().keys():
+                    full_module_name = '.'.join((new_module_name, k))
+                    module_name_mapping[full_module_name] = full_module_name.replace("ffn.experts.mlp", "ffn.mlp") + f'_pgidx{process_group_index}'
+    return module_name_mapping, pg_world_size
+
 def _get_module_name_mapping(model: torch.nn.Module) -> tuple[dict[str, str], int]:
     module_name_mapping = {}
     world_size = dist.get_world_size()
@@ -492,7 +511,7 @@ def load_sharded_checkpoint(
                 log.debug('Loop over optimizer state dict keys')
                 for key in list(optim_state_dict.keys()):
                     log.debug(f'Stripping {local_idx} from {key=}')
-                    optim_state_dict[key.replace(local_idx, '')] = optim_state_dict[key]
+                    optim_state_dict[key.replace(local_idx, '').replace("ffn.mlp", "ffn.experts.mlp")] = optim_state_dict[key]
                     if '_pgidx' in key:
                         del optim_state_dict[key]
                 log.debug('Load optimizer state dict')
@@ -1121,7 +1140,7 @@ class RenameLoadPlanner(DefaultLoadPlanner):
             flatten_state_dict: See parent class.
             flatten_sharded_tensors: See parent class.
         """
-        self.name_conversion_dict, self.pg_world_size = _get_module_name_mapping(model)
+        self.name_conversion_dict, self.pg_world_size = _get_module_name_mapping_load(model)
         super().__init__(flatten_state_dict, flatten_sharded_tensors)
 
     def set_up_planner(
