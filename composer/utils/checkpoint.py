@@ -504,7 +504,9 @@ def load_sharded_checkpoint(
                     if '_pgidx' in key or 'ffn.mlp' in key:
                         del optim_state_dict[key]
 
-                print(optim_state_dict)
+
+                print(f"{list(state.state_dict()['model'].keys())=}")
+                print(f"{list(optim_state_dict.keys())=}")
                 log.debug('Load optimizer state dict')
                 state.load_optim_state(optim_state)
 
