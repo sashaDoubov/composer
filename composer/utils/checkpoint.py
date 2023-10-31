@@ -307,7 +307,7 @@ def _get_module_name_mapping_load(model: torch.nn.Module) -> tuple[dict[str, str
             if process_group_size != world_size:
                 custom_process_group_size = world_size // process_group_size
                 process_group_index = dist.get_global_rank() % custom_process_group_size
-                pg_world_size = max(pg_world_size, process_group_index + 1)
+                pg_world_size = max(pg_world_size, custom_process_group_size)
                 print(f"{module_name=}")
                 print(f"{custom_process_group_size=}")
                 print(f"{process_group_index=}")
