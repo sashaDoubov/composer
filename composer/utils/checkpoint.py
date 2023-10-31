@@ -519,7 +519,16 @@ def load_sharded_checkpoint(
                     optim_state_dict[key.replace(local_idx, '').replace("ffn.mlp", "ffn.experts.mlp")] = optim_state_dict[key]
                     if '_pgidx' in key:
                         del optim_state_dict[key]
+
+                log.debug('Replace param names')
+                param_groups = optim_state['optimizers']['DecoupledLionW']['param_groups']
+                assert len(param_groups) == 1
+                param_group = param_groups[0]
+                param_group['params'] = [param_name.replace("ffn.mlp", "ffn.experts.mlp") for param_name in param_group]
+
                 log.debug('Load optimizer state dict')
+                print(f"{list(optim_state['optimizers']['DecoupledLionW']['state'].keys())=}")
+                print(f"{list(state.state_dict()['model'])=}")
                 state.load_optim_state(optim_state)
 
         # 3. Optionally load RNG
