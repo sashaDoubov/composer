@@ -308,10 +308,15 @@ def _get_module_name_mapping_load(model: torch.nn.Module) -> tuple[dict[str, str
                 custom_process_group_size = world_size // process_group_size
                 process_group_index = dist.get_global_rank() % custom_process_group_size
                 pg_world_size = max(pg_world_size, process_group_index + 1)
+                print(f"{module_name=}")
+                print(f"{custom_process_group_size=}")
+                print(f"{process_group_index=}")
                 new_module_name = module_name.replace('_fsdp_wrapped_module.', '')
                 for k in module.state_dict().keys():
                     full_module_name = '.'.join((new_module_name, k))
                     module_name_mapping[full_module_name] = full_module_name.replace("ffn.experts.mlp", "ffn.mlp") + f'_pgidx{process_group_index}'
+
+    print(f"{pg_world_size=}")
     return module_name_mapping, pg_world_size
 
 def _get_module_name_mapping(model: torch.nn.Module) -> tuple[dict[str, str], int]:
@@ -1141,7 +1146,7 @@ class RenameLoadPlanner(DefaultLoadPlanner):
             flatten_sharded_tensors: See parent class.
         """
         self.name_conversion_dict, self.pg_world_size = _get_module_name_mapping_load(model)
-        assert self.pg_world_size != 1
+        print(f"{self.pg_world_size=}")
         super().__init__(flatten_state_dict, flatten_sharded_tensors)
 
     def set_up_planner(
@@ -1203,6 +1208,7 @@ class RenameLoadPlanner(DefaultLoadPlanner):
         It handles resharding by issuing multiple read requests against storage in order to match
         load requirements.
         """
+        print(self.pg_world_size)
         if self.pg_world_size != 1:
             return super().create_local_plan()
 
