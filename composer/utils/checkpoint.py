@@ -520,11 +520,10 @@ def load_sharded_checkpoint(
                 param_groups = optim_state['optimizers']['DecoupledLionW']['param_groups']
                 assert len(param_groups) == 1
                 param_group = param_groups[0]
-                param_group['params'] = [param_name.replace("ffn.mlp", "ffn.experts.mlp") for param_name in param_group]
+                param_group['params'] = [param_name.replace("ffn.mlp", "ffn.experts.mlp") for param_name in param_group['params']]
+                log.debug(param_group)
 
                 log.debug('Load optimizer state dict')
-                print(f"{list(optim_state['optimizers']['DecoupledLionW']['state'].keys())=}")
-                print(f"{list(state.state_dict()['model'])=}")
                 state.load_optim_state(optim_state)
 
         # 3. Optionally load RNG
@@ -1213,7 +1212,6 @@ class RenameLoadPlanner(DefaultLoadPlanner):
         It handles resharding by issuing multiple read requests against storage in order to match
         load requirements.
         """
-        print(self.pg_world_size)
         if self.pg_world_size != 1:
             return super().create_local_plan()
 
