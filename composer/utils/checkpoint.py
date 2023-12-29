@@ -1325,7 +1325,6 @@ class RenameLoadPlanner(DefaultLoadPlanner):
                     renamed_fqns.append(original_key)
             for fqn in renamed_fqns:
                 md = self.metadata.state_dict_metadata[fqn]
-                log.debug(f"obj : {obj}")
                 requests += _create_read_items(fqn, md, obj)
 
         return LoadPlan(requests)
