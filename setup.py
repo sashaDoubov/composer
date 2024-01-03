@@ -98,13 +98,13 @@ extra_deps['dev'] = [
     # Pinning versions strictly to avoid random test failures.
     # Should manually update dependency versions occassionally.
     'custom_inherit==2.4.1',
-    'junitparser==3.1.0',
+    'junitparser==3.1.1',
     'coverage[toml]==7.3.4',
     'fasteners==0.18',  # object store tests require fasteners
-    'pytest==7.4.3',
+    'pytest==7.4.4',
     'toml==0.10.2',
     'ipython==8.11.0',
-    'ipykernel==6.26.0',
+    'ipykernel==6.28.0',
     'jupyter==1.0.0',
     'yamllint==1.33.0',
     'recommonmark==0.7.1',
@@ -184,7 +184,7 @@ extra_deps['coco'] = [
 ]
 
 extra_deps['nlp'] = [
-    'transformers>=4.11,<4.36,!=4.34.0',
+    'transformers>=4.11,<4.37,!=4.34.0',
     'datasets>=2.4,<3',
 ]
 
@@ -223,12 +223,12 @@ extra_deps['onnx'] = [
 ]
 
 extra_deps['mlflow'] = [
-    'mlflow>=2.5.0,<3.0',
+    'mlflow>=2.9.0,<3.0',
 ]
 
 extra_deps['pandas'] = ['pandas>=2.0.0,<3.0']
 
-extra_deps['databricks'] = ['databricks-sdk>=0.8.0,<1.0']
+extra_deps['databricks'] = ['databricks-sdk>=0.15.0,<1.0']
 
 extra_deps['all'] = {dep for deps in extra_deps.values() for dep in deps}
 
