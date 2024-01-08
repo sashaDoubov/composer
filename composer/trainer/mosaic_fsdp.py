@@ -60,3 +60,11 @@ def patch_pytorch():
         # Allow 2D HSDP
         from torch.distributed.fsdp import _runtime_utils
         _runtime_utils._validate_and_get_hybrid_shard_state = lambda *args, **kwargs: None
+
+    elif version.parse(torch.__version__) < version.parse('2.2.1'):
+        # Monkey patch for torch < 2.2.1 ie torch == 2.2.0
+
+        from composer.trainer.mosaic_fsdp_utils import init_fn_t2p2p0
+
+        # Monkey patch __init__ where __init__ calls the custom _auto_wrap fn
+        FullyShardedDataParallel.__init__ = init_fn_t2p2p0  # type: ignore
