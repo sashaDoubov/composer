@@ -10,6 +10,7 @@ import multiprocessing
 import os
 import pathlib
 import queue
+import random
 import shutil
 import tempfile
 import threading
@@ -241,7 +242,7 @@ class RemoteUploaderDownloader(LoggerDestination):
                  num_concurrent_uploads: int = 1,
                  upload_staging_folder: Optional[str] = None,
                  use_procs: bool = True,
-                 num_attempts: int = 3) -> None:
+                 num_attempts: int = 10) -> None:
         parsed_remote_bucket = urlparse(bucket_uri)
         self.remote_backend_name, self.remote_bucket_name = parsed_remote_bucket.scheme, parsed_remote_bucket.netloc
         self.backend_kwargs = backend_kwargs if backend_kwargs is not None else {}
@@ -664,4 +665,6 @@ def _upload_worker(
             file_queue.task_done()
             completed_queue.put_nowait(remote_file_name)
 
+        jitter_sec = 90
+        time.sleep(random.uniform(0, jitter_sec))
         upload_file()
