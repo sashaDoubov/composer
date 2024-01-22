@@ -10,7 +10,6 @@ import multiprocessing
 import os
 import pathlib
 import queue
-import random
 import shutil
 import tempfile
 import threading
@@ -665,6 +664,6 @@ def _upload_worker(
             file_queue.task_done()
             completed_queue.put_nowait(remote_file_name)
 
-        jitter_sec = 90
-        time.sleep(random.uniform(0, jitter_sec))
+        rank_wait_interval = 1.0
+        time.sleep(rank_wait_interval * dist.get_global_rank())
         upload_file()
