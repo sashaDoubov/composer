@@ -172,7 +172,7 @@ def is_checkpoint_legacy_sharded(object_store: Optional[ObjectStore], source_pat
                 metadata_destination = os.path.join(str(temp_dir), '.metadata')
                 object_store.download_object(object_name=metadata_path, filename=metadata_destination)
             return False
-        except FileNotFoundError:
+        except FileNotFoundError as e:
             return True
 
 
@@ -641,7 +641,7 @@ def download_checkpoint(path: str,
                 raise FileNotFoundError(
                     (f'Checkpoint {_format_path_with_current_rank(path)} does not exist, '
                      f'but is required for sharded checkpointing on rank {dist.get_global_rank()}. '
-                     'Please ensure that the checkpoint exists and your load_path was specified as a format string'
+                     'Please ensure that the checkpoint exists and your load_path was specified as a format string '
                      'with the {rank} argument.')) from e
 
             if extracted_checkpoint_folder is not None:
