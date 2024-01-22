@@ -665,10 +665,5 @@ def _upload_worker(
             completed_queue.put_nowait(remote_file_name)
 
         rank_wait_interval = 0.5
-        if remote_file_name.endswith('.symlink'):
-            # rank0 saves symlink and we want it to wait
-            # approx as long as the last rank to finish uploading
-            time.sleep(rank_wait_interval * dist.get_world_size())
-        else:
-            time.sleep(rank_wait_interval * dist.get_global_rank())
+        time.sleep(rank_wait_interval * dist.get_global_rank())
         upload_file()
