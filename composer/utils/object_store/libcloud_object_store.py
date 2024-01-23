@@ -148,7 +148,13 @@ class LibcloudObjectStore(ObjectStore):
         Args:
             object_name (str): The name of the object.
         """
-        object_name = object_name.lstrip(self._container.name)  # Strip container for URIs
+        #print (f"attempting to download {object_name=}")
+        object_name = object_name.removeprefix(self._provider_name)
+        object_name = object_name.lstrip(':/')
+        object_name = object_name.removeprefix(self._container.name)
+        object_name = object_name.lstrip('/')
+        #print (f"reformatted to {object_name=}")
+
         from libcloud.storage.types import ObjectDoesNotExistError
         try:
             return self._provider.get_object(self._container.name, object_name)
