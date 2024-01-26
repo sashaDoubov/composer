@@ -554,7 +554,7 @@ def load_sharded_checkpoint(
                 expect_file = True
 
             # Throttle uploads to avoid overloading the object store
-            rank_wait_interval = 10.0
+            rank_wait_interval = 0.0
             log.debug(f'Rank {dist.get_global_rank()} waiting {rank_wait_interval * dist.get_local_rank()} seconds')
             time.sleep(rank_wait_interval * dist.get_local_rank())
 
@@ -1043,9 +1043,10 @@ def _save_checkpoint(
 
         if expect_file:
             if version.parse(torch.__version__) > version.parse('2.2.9'):
+                from composer.utils.monkeypatch_checkpoint import MonkeyPathFileSystemWriter
                 dist_cp.save(  # type: ignore
                     state_dict=state_dict,
-                    storage_writer=dist_cp.FileSystemWriter(dirname),
+                    storage_writer=MonkeyPathFileSystemWriter(dirname),
                     planner=save_planner,
                     process_group=process_group,
                 )
