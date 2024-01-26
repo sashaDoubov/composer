@@ -508,6 +508,9 @@ def load_sharded_checkpoint(
             self.destination_path = destination_path
             self.object_store = object_store
 
+            print(f"{self.source_path=}")
+            print(f"{self.destination_path=}")
+
             # Download metadata file.
             Path(self.destination_path).mkdir(parents=True, exist_ok=True)
             metadata_destination = os.path.join(self.destination_path, '.metadata')
@@ -532,9 +535,11 @@ def load_sharded_checkpoint(
                 file_destination = str(Path(self.destination_path) / Path(relative_file_path))
                 # The file could have already been downloaded as diffeent plan items can point to same file.
                 if not os.path.exists(file_destination):
+                    replaced_path = _extract_and_replace_rank(self.source_path, relative_file_path)
+
                     log.debug(f'Rank {dist.get_global_rank()} downloading {relative_file_path} to {file_destination}.')
                     self.object_store.download_object(object_name=str(
-                        Path(self.source_path) / Path(relative_file_path)),
+                        replaced_path / Path(relative_file_path)),
                                                       filename=file_destination)
 
             # 2. Wait for all ranks to finish.
