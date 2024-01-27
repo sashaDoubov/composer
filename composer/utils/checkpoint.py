@@ -546,24 +546,24 @@ def load_sharded_checkpoint(
                         replaced_path / Path(relative_file_path)),
                                                       filename=file_destination)
 
-            # 2. Wait for all ranks to finish.
-            log.debug(f'Rank {dist.get_global_rank()} finished downloading all files.')
-            # Use busy wait to avoid timeouts on large downloads for non-sharded checkpoints
-            signal_file_path = os.path.join(self.destination_path,
-                                            f'.node_{dist.get_node_rank()}_local_rank0_completed')
-            if dist.get_local_rank() == 0:
-                with open(signal_file_path, 'wb') as f:
-                    f.write(b'local_rank0_completed')
+            # # 2. Wait for all ranks to finish.
+            # log.debug(f'Rank {dist.get_global_rank()} finished downloading all files.')
+            # # Use busy wait to avoid timeouts on large downloads for non-sharded checkpoints
+            # signal_file_path = os.path.join(self.destination_path,
+            #                                 f'.node_{dist.get_node_rank()}_local_rank0_completed')
+            # if dist.get_local_rank() == 0:
+            #     with open(signal_file_path, 'wb') as f:
+            #         f.write(b'local_rank0_completed')
 
-            # Avoid the collective call until the local rank zero has finished trying to download the
-            # checkpoint so that we don't timeout for large downloads. This syncs all processes on the
-            # node
-            with dist.local_rank_zero_download_and_wait(signal_file_path):
-                # Then, wait to ensure every node has finished downloading the checkpoint
-                dist.barrier()
+            # # Avoid the collective call until the local rank zero has finished trying to download the
+            # # checkpoint so that we don't timeout for large downloads. This syncs all processes on the
+            # # node
+            # with dist.local_rank_zero_download_and_wait(signal_file_path):
+            #     # Then, wait to ensure every node has finished downloading the checkpoint
+            #     dist.barrier()
 
-            if dist.get_local_rank() == 0:
-                os.remove(signal_file_path)
+            # if dist.get_local_rank() == 0:
+            #     os.remove(signal_file_path)
             dist.barrier()
 
             # 3. Piggyback off of the FileSystemReader to read all the files now that they are downloaded.
