@@ -8,6 +8,7 @@ from __future__ import annotations
 import contextlib
 import fnmatch
 import logging
+import io
 import os
 import shutil
 import tarfile
@@ -16,9 +17,11 @@ import textwrap
 import warnings
 from importlib import import_module
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
+import time
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union, cast
 
 import torch
+from torch import Tensor
 from packaging import version
 
 from composer.utils import dist, reproducibility
@@ -337,6 +340,7 @@ def load_checkpoint(
                 dist.barrier()
         log.info('%s loaded from %s', 'Model weights' if load_weights_only else 'Trainer checkpoint', path)
     step_to_resume_from = state.timestamp.batch.value
+    log.debug(f"{state.timestamp.batch.value=}")
     max_step_to_resume_from = state.device.tensor_to_device(torch.tensor(state.timestamp.batch.value,
                                                                          dtype=torch.int64))
     min_step_to_resume_from = state.device.tensor_to_device(torch.tensor(state.timestamp.batch.value,
@@ -387,7 +391,9 @@ def load_sharded_checkpoint(
     from torch.distributed import checkpoint as dist_cp
     from torch.distributed.checkpoint.metadata import Metadata
     from torch.distributed.checkpoint.optimizer import load_sharded_optimizer_state_dict
-    from torch.distributed.checkpoint.planner import LoadPlan, LoadPlanner
+    from torch.distributed.checkpoint.planner import LoadPlan, LoadPlanner, LoadItemType
+    from torch.distributed.checkpoint.filesystem import narrow_tensor_by_index
+    from torch.futures import Future
 
     # This function is used so we can figure out which ranks need to load saved rngs and which can just make their own.
     def _get_num_ranks_that_saved_rng(metadata: Metadata):
@@ -399,12 +405,39 @@ def load_sharded_checkpoint(
         rng_inds = set(rng_inds)
         return len(rng_inds)
 
+
+
+    def _extract_and_replace_rank(rank_string, substring):
+        import re
+
+        if isinstance(rank_string, Path):
+            rank_string = str(rank_string)
+
+        if isinstance(substring, Path):
+            substring = str(substring)
+
+        # Define a regex pattern to match __number_number.distcp
+        pattern = r'__(\d+)_\d+\.distcp'
+
+        # Search for the pattern in the substring to extract the rank
+        match = re.search(pattern, substring)
+
+        # If a match is found, replace the number in rank_string with the extracted rank
+        if match:
+            extracted_rank = match.group(1)
+            # Replace the number in rank_string with extracted_rank
+            new_rank_string = re.sub(r'RANK-\d+', f'RANK-{extracted_rank}', rank_string)
+            return Path(new_rank_string)
+        else:
+            return Path(rank_string)
+
     class FileSystemReaderWithValidation(dist_cp.FileSystemReader):
         """FileSystemReader that validates checkpoint files prior to reading."""
 
         def __init__(self, path: str):
             if _get_checkpoint_validation_function() is None:
                 log.info('No checkpoint validation function found when loading sharded checkpoints.')
+                log.debug(f"{path=}")
             super().__init__(path)
 
         def read_data(self, plan: LoadPlan, planner: LoadPlanner):
@@ -415,12 +448,51 @@ def load_sharded_checkpoint(
             """
             validated_checkpoint_paths = set()
             for read_item in plan.items:
-                data_path = self.path / self.storage_data[read_item.storage_index].relative_path
+                relative_path = self.storage_data[read_item.storage_index].relative_path
+
+                str_replaced_path = _extract_and_replace_rank(self.path, relative_path)
+
+                data_path = str_replaced_path / relative_path
                 if data_path in validated_checkpoint_paths:
                     continue
                 _ensure_valid_checkpoint(data_path)
                 validated_checkpoint_paths.add(data_path)
-            return super().read_data(plan, planner)
+            
+            per_file = dict()
+            for read_item in plan.items:
+                item_md = self.storage_data[read_item.storage_index]
+                path = item_md.relative_path
+                per_file.setdefault(path, []).append(read_item)
+
+            for relative_path, reqs in per_file.items():
+                str_replaced_path = _extract_and_replace_rank(self.path, relative_path)
+                with (str_replaced_path / relative_path).open("rb") as file:
+                    # TODO sort by offset and cache the reading
+                    for req in reqs:
+                        item_md = self.storage_data[req.storage_index]
+                        file_slice = self._slice_file(file, item_md)
+                        if req.type == LoadItemType.BYTE_IO:
+                            bytes = io.BytesIO(file_slice.read(item_md.length))
+                            bytes.seek(0)
+                            planner.load_bytes(req, bytes)
+                        else:
+                            tensor = cast(
+                                Tensor, torch.load(file_slice, map_location="cpu")
+                            )
+                            tensor = narrow_tensor_by_index(
+                                tensor, req.storage_offsets, req.lengths
+                            )
+                            target_tensor = planner.resolve_tensor(req).detach()
+
+                            assert (
+                                target_tensor.size() == tensor.size()
+                            ), f"req {req.storage_index} mismatch sizes {target_tensor.size()} vs {tensor.size()}"
+                            target_tensor.copy_(tensor)
+                            planner.commit_tensor(req, target_tensor)
+
+            fut: Future = Future()
+            fut.set_result(None)
+            return fut
 
         def read_metadata(self) -> Metadata:
             """Reads metadata file.
@@ -428,6 +500,8 @@ def load_sharded_checkpoint(
             Raises:
                 ValueError if the metadata file is invalid.
             """
+
+            log.debug(f"metadata {self.path=}")
             metadata_file_path = self.path / '.metadata'
             _ensure_valid_checkpoint(metadata_file_path)
             return super().read_metadata()
@@ -439,6 +513,9 @@ def load_sharded_checkpoint(
             self.source_path = source_path
             self.destination_path = destination_path
             self.object_store = object_store
+
+            print(f"{self.source_path=}")
+            print(f"{self.destination_path=}")
 
             # Download metadata file.
             Path(self.destination_path).mkdir(parents=True, exist_ok=True)
@@ -463,8 +540,11 @@ def load_sharded_checkpoint(
                 file_destination = str(Path(self.destination_path) / Path(relative_file_path))
                 # The file could have already been downloaded as diffeent plan items can point to same file.
                 if not os.path.exists(file_destination):
+                    replaced_path = _extract_and_replace_rank(self.source_path, relative_file_path)
+
+                    log.debug(f'Rank {dist.get_global_rank()} downloading {relative_file_path} to {file_destination}.')
                     self.object_store.download_object(object_name=str(
-                        Path(self.source_path) / Path(relative_file_path)),
+                        replaced_path / Path(relative_file_path)),
                                                       filename=file_destination)
 
             # 2. Wait for all ranks to finish.
