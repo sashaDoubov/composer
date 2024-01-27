@@ -340,6 +340,7 @@ def load_checkpoint(
                 dist.barrier()
         log.info('%s loaded from %s', 'Model weights' if load_weights_only else 'Trainer checkpoint', path)
     step_to_resume_from = state.timestamp.batch.value
+    log.debug(f"{state.timestamp.batch.value=}")
     max_step_to_resume_from = state.device.tensor_to_device(torch.tensor(state.timestamp.batch.value,
                                                                          dtype=torch.int64))
     min_step_to_resume_from = state.device.tensor_to_device(torch.tensor(state.timestamp.batch.value,
@@ -436,6 +437,7 @@ def load_sharded_checkpoint(
         def __init__(self, path: str):
             if _get_checkpoint_validation_function() is None:
                 log.info('No checkpoint validation function found when loading sharded checkpoints.')
+                log.debug(f"{path=}")
             super().__init__(path)
 
         def read_data(self, plan: LoadPlan, planner: LoadPlanner):
@@ -498,6 +500,8 @@ def load_sharded_checkpoint(
             Raises:
                 ValueError if the metadata file is invalid.
             """
+
+            log.debug(f"metadata {self.path=}")
             metadata_file_path = self.path / '.metadata'
             _ensure_valid_checkpoint(metadata_file_path)
             return super().read_metadata()
