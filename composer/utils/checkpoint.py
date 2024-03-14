@@ -153,46 +153,113 @@ def _get_num_ranks_that_saved_rng(metadata: Metadata):
     return len(rng_inds)
 
 
-class FileSystemReaderWithValidation(dist_cp.FileSystemReader):
-    """FileSystemReader that validates checkpoint files prior to reading."""
+class FileSystemReader(dist_cp.FileSystemReader):
+    def __init__(self, path1, path2, alpha, one_minus_alpha):
+        super().__init__()
+        self.fs = dist_cp.FileSystem()
+        self.path1 = self.fs.init_path(path1)
+        self.path2 = self.fs.init_path(path2)
+        self.alpha = alpha
+        self.one_minus_alpha = one_minus_alpha
+        self.storage_data = dict()
 
-    def __init__(self, path: str):
-        if _get_checkpoint_validation_function() is None:
-            log.info('No checkpoint validation function found when loading sharded checkpoints.')
-        super().__init__(path)
+    def _slice_file(self, file, sinfo):
+        return dist_cp._create_file_view(file, sinfo.offset, sinfo.length)
 
-    def read_data(self, plan: LoadPlan, planner: LoadPlanner):
-        """Reads data file.
-
-        Raises:
-            ValueError if the data file is invalid.
-        """
-        validated_checkpoint_paths = set()
+    def read_data(self, plan, planner):
+        # group requests by file
+        per_file = dict()
         for read_item in plan.items:
-            data_path = self.path / self.storage_data[read_item.storage_index].relative_path
-            if data_path in validated_checkpoint_paths:
-                continue
-            _ensure_valid_checkpoint(data_path)
-            validated_checkpoint_paths.add(data_path)
-        return super().read_data(plan, planner)
+            item_md = self.storage_data[read_item.storage_index]
+            path = item_md.relative_path
+            per_file.setdefault(path, []).append(read_item)
 
-    def read_metadata(self) -> Metadata:
-        """Reads metadata file.
+        log.debug(f"{self.path1=}")
+        log.debug(f"{self.path2=}")
 
-        Raises:
-            ValueError if the metadata file is invalid.
-        """
-        metadata_file_path = self.path / '.metadata'
-        _ensure_valid_checkpoint(metadata_file_path)
-        return super().read_metadata()
+        for relative_path, reqs in per_file.items():
+
+            new_path = self.fs.concat_path(self.path1, relative_path)
+            new_path2 = self.fs.concat_path(self.path2, relative_path)
+
+            with self.fs.create_stream(new_path, "rb") as stream:
+                with self.fs.create_stream(new_path2, "rb") as stream2:
+                    # TODO sort by offset and cache the reading
+                    for req in reqs:
+                        item_md = self.storage_data[req.storage_index]
+
+                        file_slice = self._slice_file(stream, item_md)
+                        file_slice2 = self._slice_file(stream2, item_md)
+
+                        if req.type == LoadItemType.BYTE_IO:
+                            read_bytes = io.BytesIO(file_slice.read(item_md.length))
+                            read_bytes.seek(0)
+                            planner.load_bytes(req, read_bytes)
+                        else:
+                            tensor = cast(
+                                Tensor,
+                                torch.load(cast(IO[bytes], file_slice), map_location="cpu"),
+                            )
+
+                            tensor2 = cast(
+                                Tensor,
+                                torch.load(cast(IO[bytes], file_slice2), map_location="cpu"),
+                            )
+
+                            tensor = narrow_tensor_by_index(
+                                tensor, req.storage_offsets, req.lengths
+                            )
+
+                            tensor2 = narrow_tensor_by_index(
+                                tensor2, req.storage_offsets, req.lengths
+                            )
+
+                            tensor = tensor * alpha + one_minus_alpha * tensor2 
+
+                            target_tensor = planner.resolve_tensor(req).detach()
+
+                            assert (
+                                target_tensor.size() == tensor.size()
+                            ), f"req {req.storage_index} mismatch sizes {target_tensor.size()} vs {tensor.size()}"
+                            target_tensor.copy_(tensor)
+                            planner.commit_tensor(req, target_tensor)
+
+        fut = Future()
+        fut.set_result(None)
+        return fut
+
+    # Implementing the abstract function in StorageReader
+    def read_metadata(self):
+        path = self.fs.concat_path(self.path1, ".metadata")
+        with self.fs.create_stream(path, "rb") as metadata_file:
+            pickle1 = pickle.load(metadata_file)
+
+        path = self.fs.concat_path(self.path2, ".metadata")
+        with self.fs.create_stream(path, "rb") as metadata_file:
+            pickle2 = pickle.load(metadata_file)
+
+        return pickle1, pickle2
+
+    def set_up_storage_reader(self, metadata, is_coordinator):
+        self.storage_data = metadata.storage_data
+        assert self.storage_data is not None
+
+    def prepare_local_plan(self, plan):
+        return plan
+
+    def prepare_global_plan(self, global_plan):
+        return global_plan
 
 
 # A subclass of FileSystemReaderWithValidation that downloads files from the object store before reading them from the local filesystem.
-class DistCPObjectStoreReader(FileSystemReaderWithValidation):
+class DistCPObjectStoreReader(FileSystemReader):
 
     def __init__(
         self,
         source_path: str,
+        second_load_path: str,
+        mix_alpha: float,
+        mix_1_minus_alpha: float,
         destination_path: str,
         object_store: Union[ObjectStore, LoggerDestination],
         device_mesh: Optional[DeviceMesh],
@@ -202,27 +269,49 @@ class DistCPObjectStoreReader(FileSystemReaderWithValidation):
         self.object_store = object_store
         self.device_mesh = device_mesh
 
+        self.second_load_path = second_load_path
+        self.mix_alpha = mix_alpha,
+        self.mix_1_minus_alpha = mix_1_minus_alpha
+
+        self.destination_path_1 = str(Path(self.destination_path) / Path('chkpt_1')))
+        self.destination_path_2 = str(Path(self.destination_path) / Path('chkpt_2')))
+
         # Download metadata file.
-        Path(self.destination_path).mkdir(parents=True, exist_ok=True)
-        metadata_destination = os.path.join(self.destination_path, '.metadata')
+        Path(self.destination_path_1).mkdir(parents=True, exist_ok=True)
+        Path(self.destination_path_2).mkdir(parents=True, exist_ok=True)
+
+        metadata_destination_1 = os.path.join(self.destination_path_1, '.metadata')
+        metadata_destination_2 = os.path.join(self.destination_path_2, '.metadata')
+
         if dist.get_local_rank() == 0:
             metadata_path = str(Path(source_path) / Path('.metadata'))
             if isinstance(object_store, ObjectStore):
                 object_store.download_object(
                     object_name=metadata_path,
-                    filename=metadata_destination,
+                    filename=metadata_destination_1,
                 )
             else:
                 object_store.download_file(
                     remote_file_name=metadata_path,
-                    destination=metadata_destination,
+                    destination=metadata_destination_1,
+                )
+            metadata_path = str(Path(second_load_path) / Path('.metadata'))
+            if isinstance(object_store, ObjectStore):
+                object_store.download_object(
+                    object_name=metadata_path,
+                    filename=metadata_destination_2,
+                )
+            else:
+                object_store.download_file(
+                    remote_file_name=metadata_path,
+                    destination=metadata_destination_2,
                 )
         dist.barrier()
 
         # FileSystemReader takes in a root directory in its constructor, which is the dir where
         # the metadata is expected to be stored. Also, this is parent directory for any shard file relative paths
         # specified in the metadata file.
-        super().__init__(destination_path)
+        super().__init__(destination_path_1, destination_path_2, mix_alpha, mix_1_minus_alpha)
 
     def read_data(self, plan: LoadPlan, planner: LoadPlanner):
         # Download files if not using HSDP or if on first replica with HSDP enabled
@@ -610,6 +699,9 @@ def load_sharded_checkpoint(
                 source_path = extract_path_from_symlink(source_path, object_store=object_store)
             storage_reader = DistCPObjectStoreReader(
                 source_path=source_path,
+                second_load_path = state.fsdp_config['second_load_path'],
+                mix_alpha = state.fsdp_config['alpha'],
+                mix_1_minus_alpha = state.fsdp_config['one_minus_alpha'],
                 destination_path=str(Path(rank0_download_tempdir) / Path('checkpoints')),
                 object_store=object_store,
                 device_mesh=state.fsdp_device_mesh,
@@ -627,7 +719,7 @@ def load_sharded_checkpoint(
                 # For older versions of torch, we load optimizer separately.
                 if version.parse(torch.__version__) < version.parse('2.2.9'):
                     cur_state_dict.pop('optimizers')
-                num_rng_ranks = _get_num_ranks_that_saved_rng(storage_reader.read_metadata())
+                num_rng_ranks = _get_num_ranks_that_saved_rng(storage_reader.read_metadata()[0])
                 state_dict: Dict[str, Any] = {
                     'state': cur_state_dict,
                     'rng': reproducibility.get_rng_state()[:num_rng_ranks],
