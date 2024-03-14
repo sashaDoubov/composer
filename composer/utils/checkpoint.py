@@ -273,8 +273,8 @@ class DistCPObjectStoreReader(FileSystemReader):
         self.mix_alpha = mix_alpha,
         self.mix_1_minus_alpha = mix_1_minus_alpha
 
-        self.destination_path_1 = str(Path(self.destination_path) / Path('chkpt_1')))
-        self.destination_path_2 = str(Path(self.destination_path) / Path('chkpt_2')))
+        self.destination_path_1 = str(Path(self.destination_path) / Path('chkpt_1'))
+        self.destination_path_2 = str(Path(self.destination_path) / Path('chkpt_2'))
 
         # Download metadata file.
         Path(self.destination_path_1).mkdir(parents=True, exist_ok=True)
