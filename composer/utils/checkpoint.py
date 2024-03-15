@@ -342,7 +342,7 @@ class FileSystemReader(dist_cp.FileSystemReader):
                                 tensor2, req.storage_offsets, req.lengths
                             )
 
-                            tensor = tensor * alpha + one_minus_alpha * tensor2 
+                            tensor = tensor * self.alpha + self.one_minus_alpha * tensor2 
 
                             target_tensor = planner.resolve_tensor(req).detach()
 
