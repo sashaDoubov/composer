@@ -44,6 +44,7 @@ from torch.distributed.checkpoint.metadata import Metadata
 from torch.distributed.checkpoint.optimizer import load_sharded_optimizer_state_dict
 from torch.distributed.checkpoint.planner import LoadPlan, LoadPlanner, LoadItemType
 from torch.distributed._shard._utils import narrow_tensor_by_index
+from torch import Tensor
 
 from composer.utils import dist, reproducibility
 from composer.utils.file_helpers import (
