@@ -332,7 +332,7 @@ class FileSystemReader(dist_cp.FileSystemReader):
         return pickle1, pickle2
 
     def set_up_storage_reader(self, metadata, is_coordinator):
-        self.storage_data = metadata.storage_data
+        self.storage_data = metadata.storage_data[0]
         assert self.storage_data is not None
 
     def prepare_local_plan(self, plan):
