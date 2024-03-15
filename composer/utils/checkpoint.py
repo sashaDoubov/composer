@@ -477,7 +477,7 @@ class DistCPObjectStoreReader(FileSystemReader):
             receiver = dist.get_global_rank() != rank_in_first_replica
 
             # Send list of files to all ranks
-            file_list = [sorted(os.listdir(self.destination_path))]
+            file_list = [sorted(os.listdir(self.destination_path_1))]
             dist.broadcast_object_list(file_list, src=rank_in_first_replica, group=replicate_process_group)
             file_list = file_list[0]
             log.debug(f'List of files to broadcast: {file_list}')
@@ -487,7 +487,35 @@ class DistCPObjectStoreReader(FileSystemReader):
                 if 'metadata' in file_name:  # All ranks already have the metadata file
                     continue
                 if dist.get_local_rank() == 0:  # Only 1 rank per node needs to transfer file
-                    full_path = os.path.join(self.destination_path, file_name)
+                    full_path = os.path.join(self.destination_path_1, file_name)
+                    log.debug(f'Transferring {full_path=}')
+                    file_object = [None]
+                    if sender:
+                        with open(full_path, 'rb') as f:
+                            file_object = [{'content': f.read()}]
+                    dist.broadcast_object_list(
+                        file_object,
+                        src=dist.get_global_rank() % shard_size,
+                        group=replicate_process_group,
+                    )
+                    received_file_object = file_object[0]
+                    assert received_file_object is not None
+                    if receiver and not os.path.exists(full_path):
+                        with open(full_path, 'wb') as f:
+                            f.write(received_file_object['content'])
+            
+               # Send list of files to all ranks
+            file_list = [sorted(os.listdir(self.destination_path_2))]
+            dist.broadcast_object_list(file_list, src=rank_in_first_replica, group=replicate_process_group)
+            file_list = file_list[0]
+            log.debug(f'List of files to broadcast: {file_list}')
+
+            # Send each file to the appropriate rank
+            for file_name in file_list:
+                if 'metadata' in file_name:  # All ranks already have the metadata file
+                    continue
+                if dist.get_local_rank() == 0:  # Only 1 rank per node needs to transfer file
+                    full_path = os.path.join(self.destination_path_2, file_name)
                     log.debug(f'Transferring {full_path=}')
                     file_object = [None]
                     if sender:
@@ -507,7 +535,7 @@ class DistCPObjectStoreReader(FileSystemReader):
             log.debug(f'Rank {dist.get_global_rank()} finished transferring files to all ranks.')
             dist.barrier()
             log.debug(
-                f'Done waiting for all ranks to finish transferring files. Local checkpoint files: {sorted(os.listdir(self.destination_path))}',
+                f'Done waiting for all ranks to finish transferring files. Local checkpoint files: {sorted(os.listdir(self.destination_path_1))  {sorted(os.listdir(self.destination_path_2))}',
             )
 
         # 5. Piggyback off of the FileSystemReader to read all the files now that they are downloaded.
