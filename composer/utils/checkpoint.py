@@ -329,18 +329,7 @@ class FileSystemReader(dist_cp.FileSystemReader):
         with self.fs.create_stream(path, "rb") as metadata_file:
             pickle2 = pickle.load(metadata_file)
 
-        return pickle1, pickle2
-
-    def set_up_storage_reader(self, metadata, is_coordinator):
-        self.storage_data = metadata[0].storage_data
-        assert self.storage_data is not None
-
-    def prepare_local_plan(self, plan):
-        return plan
-
-    def prepare_global_plan(self, global_plan):
-        return global_plan
-
+        return pickle1
 
 # A subclass of FileSystemReaderWithValidation that downloads files from the object store before reading them from the local filesystem.
 class DistCPObjectStoreReader(FileSystemReader):
