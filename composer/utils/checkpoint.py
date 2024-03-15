@@ -32,7 +32,7 @@ from typing import (
     Union,
 )
 import io
-
+from torch.distributed.checkpoint import FileSystem
 from torch.futures import Future
 
 import torch
@@ -172,7 +172,7 @@ def _get_num_ranks_that_saved_rng(metadata: Metadata):
 
 class FileSystemReader(dist_cp.FileSystemReader):
     def __init__(self, path1, path2, alpha, one_minus_alpha):
-        self.fs = dist_cp.FileSystem()
+        self.fs = FileSystem()
         self.path1 = self.fs.init_path(path1)
         self.path2 = self.fs.init_path(path2)
         self.alpha = alpha
