@@ -18,6 +18,23 @@ from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
+from typing import (
+    Callable,
+    cast,
+    Dict,
+    Generator,
+    IO,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
+import io
+
+from torch.futures import Future
+
 import torch
 from packaging import version
 from torch.distributed import checkpoint as dist_cp
@@ -155,7 +172,6 @@ def _get_num_ranks_that_saved_rng(metadata: Metadata):
 
 class FileSystemReader(dist_cp.FileSystemReader):
     def __init__(self, path1, path2, alpha, one_minus_alpha):
-        super().__init__()
         self.fs = dist_cp.FileSystem()
         self.path1 = self.fs.init_path(path1)
         self.path2 = self.fs.init_path(path2)
@@ -703,8 +719,8 @@ def load_sharded_checkpoint(
             storage_reader = DistCPObjectStoreReader(
                 source_path=source_path,
                 second_load_path = state.fsdp_config['second_load_path'],
-                mix_alpha = state.fsdp_config['alpha'],
-                mix_1_minus_alpha = state.fsdp_config['one_minus_alpha'],
+                mix_alpha = state.fsdp_config['weight_one'],
+                mix_1_minus_alpha = state.fsdp_config['weight_two'],
                 destination_path=str(Path(rank0_download_tempdir) / Path('checkpoints')),
                 object_store=object_store,
                 device_mesh=state.fsdp_device_mesh,
