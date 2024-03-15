@@ -426,7 +426,25 @@ class DistCPObjectStoreReader(FileSystemReader):
 
                 # Download the shard file to the relative path it's associated to and save that relative path
                 # to the root directory specified to the FileSystem reader constructor.
-                file_destination = str(Path(self.destination_path) / Path(relative_file_path))
+                file_destination = str(Path(self.destination_path_1) / Path(relative_file_path))
+
+                # The file could have already been downloaded as different plan items can point to same file.
+                if not is_downloaded and not os.path.exists(file_destination):
+                    log.debug(f'Downloading {relative_file_path} to {file_destination}.')
+                    object_name = str(Path(self.source_path) / Path(relative_file_path))
+                    if isinstance(self.object_store, ObjectStore):
+                        self.object_store.download_object(
+                            object_name=object_name,
+                            filename=file_destination,
+                        )
+                    else:
+                        self.object_store.download_file(
+                            remote_file_name=object_name,
+                            destination=file_destination,
+                        )
+                    log.debug(f'Finished downloading {relative_file_path} to {file_destination}.')
+                
+                file_destination = str(Path(self.destination_path_2) / Path(relative_file_path))
 
                 # The file could have already been downloaded as different plan items can point to same file.
                 if not is_downloaded and not os.path.exists(file_destination):
