@@ -540,6 +540,9 @@ class DistCPObjectStoreReader(FileSystemReader):
                     if receiver and not os.path.exists(full_path):
                         with open(full_path, 'wb') as f:
                             f.write(received_file_object['content'])
+                        
+            dist.barrier()
+            torch.cuda.empty_cache()
             
                # Send list of files to all ranks
             file_list = [sorted(os.listdir(self.destination_path_2))]
@@ -571,6 +574,8 @@ class DistCPObjectStoreReader(FileSystemReader):
 
             log.debug(f'Rank {dist.get_global_rank()} finished transferring files to all ranks.')
             dist.barrier()
+
+            torch.cuda.empty_cache() 
             log.debug(
                 f'Done waiting for all ranks to finish transferring files. Local checkpoint files: {sorted(os.listdir(self.destination_path_1))}  {sorted(os.listdir(self.destination_path_2))}',
             )
