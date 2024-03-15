@@ -17,6 +17,7 @@ import warnings
 from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
+from abc import ABC, abstractmethod
 
 from typing import (
     Callable,
@@ -169,6 +170,80 @@ def _get_num_ranks_that_saved_rng(metadata: Metadata):
     rng_inds = set(rng_inds)
     return len(rng_inds)
 
+
+class FileSystemBase(ABC):
+    @contextmanager
+    @abstractmethod
+    def create_stream(
+        self, path, mode: str
+    ):
+        ...
+
+    @abstractmethod
+    def concat_path(
+        self, path, suffix: str
+    ):
+        ...
+
+    @abstractmethod
+    def rename(
+        self, path, new_path
+    ) -> None:
+        ...
+
+    @abstractmethod
+    def init_path(self, path):
+        ...
+
+    @abstractmethod
+    def mkdir(self, path) -> None:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def validate_checkpoint_id(cls, checkpoint_id) -> bool:
+        ...
+
+
+class FileSystem(FileSystemBase):
+    @contextmanager
+    def create_stream(
+        self, path, mode: str
+    ):
+        with cast(Path, path).open(mode) as stream:
+            yield cast(io.IOBase, stream)
+
+    def concat_path(
+        self, path: Union[str, os.PathLike], suffix: str
+    ) -> Union[str, os.PathLike]:
+        return cast(Path, path) / suffix
+
+    def init_path(self, path: Union[str, os.PathLike]) -> Union[str, os.PathLike]:
+        if not isinstance(path, Path):
+            path = Path(path)
+        return path
+
+    def rename(
+        self, path: Union[str, os.PathLike], new_path: Union[str, os.PathLike]
+    ) -> None:
+        cast(Path, path).rename(cast(Path, new_path))
+
+    def mkdir(self, path: Union[str, os.PathLike]) -> None:
+        cast(Path, path).mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    def validate_checkpoint_id(cls, checkpoint_id: Union[str, os.PathLike]) -> bool:
+        if isinstance(checkpoint_id, Path):
+            return True
+
+        if "://" in str(checkpoint_id):
+            return False
+
+        for p in Path(checkpoint_id).parents:
+            if p.exists() and os.access(str(p), os.W_OK):
+                return True
+
+        return False
 
 class FileSystemReader(dist_cp.FileSystemReader):
     def __init__(self, path1, path2, alpha, one_minus_alpha):
