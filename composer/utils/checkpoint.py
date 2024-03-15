@@ -285,6 +285,9 @@ class DistCPObjectStoreReader(FileSystemReader):
 
         if dist.get_local_rank() == 0:
             metadata_path = str(Path(source_path) / Path('.metadata'))
+
+            log.debug(f'{source_path=}')
+
             if isinstance(object_store, ObjectStore):
                 object_store.download_object(
                     object_name=metadata_path,
