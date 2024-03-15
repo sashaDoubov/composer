@@ -314,7 +314,7 @@ class DistCPObjectStoreReader(FileSystemReader):
         # FileSystemReader takes in a root directory in its constructor, which is the dir where
         # the metadata is expected to be stored. Also, this is parent directory for any shard file relative paths
         # specified in the metadata file.
-        super().__init__(destination_path_1, destination_path_2, mix_alpha, mix_1_minus_alpha)
+        super().__init__(self.destination_path_1, self.destination_path_2, mix_alpha, mix_1_minus_alpha)
 
     def read_data(self, plan: LoadPlan, planner: LoadPlanner):
         # Download files if not using HSDP or if on first replica with HSDP enabled
