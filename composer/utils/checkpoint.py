@@ -42,7 +42,8 @@ from torch.distributed import checkpoint as dist_cp
 from torch.distributed._tensor import DeviceMesh
 from torch.distributed.checkpoint.metadata import Metadata
 from torch.distributed.checkpoint.optimizer import load_sharded_optimizer_state_dict
-from torch.distributed.checkpoint.planner import LoadPlan, LoadPlanner
+from torch.distributed.checkpoint.planner import LoadPlan, LoadPlanner, LoadItemType
+from torch.distributed._shard._utils import narrow_tensor_by_index
 
 from composer.utils import dist, reproducibility
 from composer.utils.file_helpers import (
@@ -170,6 +171,41 @@ def _get_num_ranks_that_saved_rng(metadata: Metadata):
     rng_inds = set(rng_inds)
     return len(rng_inds)
 
+class _ReaderView(io.IOBase):
+    def __init__(self, base_stream: io.IOBase, offset: int, len: int):
+        super().__init__()
+        self.offset = offset
+        self.len = len
+        self.base_stream = base_stream
+        self.seek(0)
+
+    def seek(self, __offset: int, __whence: int = os.SEEK_SET) -> int:
+        if __whence == os.SEEK_SET:
+            __offset = self.offset + __offset
+        elif __whence == os.SEEK_END:
+            __whence = os.SEEK_SET
+            __offset = (self.offset + self.len) - __offset
+        return self.base_stream.seek(__offset, __whence)
+
+    def tell(self) -> int:
+        return self.base_stream.tell() - self.offset
+
+    def readable(self) -> bool:
+        return self.base_stream.readable()
+
+    def seekable(self) -> bool:
+        return self.base_stream.seekable()
+
+    def readinto(self, b):
+        return self.base_stream.readinto(b)  # type: ignore[attr-defined]
+
+    def read(self, size=-1):
+        return self.base_stream.read(size)
+
+
+def _create_file_view(file: io.IOBase, offset: int, length: int) -> io.IOBase:
+    # FIXME (kumpera) torch.load fails if we wrap with io.BufferedReader
+    return _ReaderView(file, offset, length)
 
 class FileSystemBase(ABC):
     @contextmanager
@@ -255,7 +291,7 @@ class FileSystemReader(dist_cp.FileSystemReader):
         self.storage_data = dict()
 
     def _slice_file(self, file, sinfo):
-        return dist_cp._create_file_view(file, sinfo.offset, sinfo.length)
+        return _create_file_view(file, sinfo.offset, sinfo.length)
 
     def read_data(self, plan, planner):
         # group requests by file
