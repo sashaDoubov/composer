@@ -535,7 +535,7 @@ class DistCPObjectStoreReader(FileSystemReader):
             log.debug(f'Rank {dist.get_global_rank()} finished transferring files to all ranks.')
             dist.barrier()
             log.debug(
-                f'Done waiting for all ranks to finish transferring files. Local checkpoint files: {sorted(os.listdir(self.destination_path_1))  {sorted(os.listdir(self.destination_path_2))}',
+                f'Done waiting for all ranks to finish transferring files. Local checkpoint files: {sorted(os.listdir(self.destination_path_1))}  {sorted(os.listdir(self.destination_path_2))}',
             )
 
         # 5. Piggyback off of the FileSystemReader to read all the files now that they are downloaded.
