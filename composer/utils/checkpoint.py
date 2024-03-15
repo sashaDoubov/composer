@@ -33,7 +33,6 @@ from typing import (
     Union,
 )
 import io
-from torch.distributed.checkpoint import FileSystem
 from torch.futures import Future
 
 import torch
