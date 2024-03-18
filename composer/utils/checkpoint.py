@@ -313,48 +313,22 @@ class FileSystemReader(dist_cp.FileSystemReader):
 
     def read_data(self, plan, planner):
         # group requests by file
+
         per_file = dict()
         for read_item in plan[0].items:
-            print(f"plan0: {read_item=}")
             item_md = self.storage_data_1[read_item.storage_index]
             path = item_md.relative_path
-            print(f"item_md: {item_md=}")
-            print(f"{read_item.storage_index.fqn}")
             per_file.setdefault(path, []).append(read_item)
-
-        fqn_to_read_item2 = dict()
-        for read_item in plan[1].items:
-            fqn_to_read_item2[read_item.storage_index.fqn] = read_item
-
 
         for relative_path, reqs in per_file.items():
 
             new_path = self.fs.concat_path(self.path1, relative_path)
-            new_path2 = self.fs.concat_path(self.path2, relative_path)
-
-            print(f"{new_path=}")
-            print(f"{new_path2=}")
-
-            # Print the file size
-            print(f"The size of {new_path} is: {new_path.stat().st_size} bytes")
-            print(f"The size of {new_path2} is: {new_path2.stat().st_size} bytes")
 
             with self.fs.create_stream(new_path, "rb") as stream:
-                with self.fs.create_stream(new_path2, "rb") as stream2:
                     # TODO sort by offset and cache the reading
                     for req in reqs:
-                        print(f"{read_item.storage_index.fqn=}")
-
-                        req2 = fqn_to_read_item2[req.storage_index.fqn]
-
-                        print(f"{req=}")
-                        print(f"{req2=}")
-
                         item_md = self.storage_data_1[req.storage_index]
-                        item_md_2 = self.storage_data_2[req2.storage_index]
-
                         file_slice = self._slice_file(stream, item_md)
-                        file_slice2 = self._slice_file(stream2, item_md_2)
 
                         if req.type == LoadItemType.BYTE_IO:
                             read_bytes = io.BytesIO(file_slice.read(item_md.length))
@@ -366,35 +340,67 @@ class FileSystemReader(dist_cp.FileSystemReader):
                                 torch.load(cast(IO[bytes], file_slice), map_location="cpu"),
                             )
 
-                            tensor2 = cast(
-                                Tensor,
-                                torch.load(cast(IO[bytes], file_slice2), map_location="cpu"),
-                            )
-
                             tensor = narrow_tensor_by_index(
                                 tensor, req.storage_offsets, req.lengths
                             )
 
-                            tensor2 = narrow_tensor_by_index(
-                                tensor2, req2.storage_offsets, req2.lengths
-                            )
-                            
-                            if len(tensor) > 2:
-                                print(f"{tensor[:2]=}")
-                                print(f"{tensor2[:2]=}")
-                                print(f"{self.alpha=}")
-                                print(f"{self.one_minus_alpha=}")
-
-                            tensor = tensor * self.alpha + self.one_minus_alpha * tensor2 
-
-                            if len(tensor) > 2:
-                                print(f"{tensor[:2]=}")
+                            tensor = tensor * self.alpha
 
                             target_tensor = planner.resolve_tensor(req).detach()
 
                             assert (
                                 target_tensor.size() == tensor.size()
                             ), f"req {req.storage_index} mismatch sizes {target_tensor.size()} vs {tensor.size()}"
+
+                            target_tensor.copy_(tensor)
+                            planner.commit_tensor(req, target_tensor)
+        per_file = dict()
+        for read_item in plan[1].items:
+            item_md = self.storage_data_2[read_item.storage_index]
+            path = item_md.relative_path
+            per_file.setdefault(path, []).append(read_item)
+
+        for relative_path, reqs in per_file.items():
+
+            new_path = self.fs.concat_path(self.path2, relative_path)
+
+            with self.fs.create_stream(new_path, "rb") as stream:
+                    # TODO sort by offset and cache the reading
+                    for req in reqs:
+                        item_md = self.storage_data_2[req.storage_index]
+                        file_slice = self._slice_file(stream, item_md)
+
+                        if req.type != LoadItemType.BYTE_IO:
+                            tensor = cast(
+                                Tensor,
+                                torch.load(cast(IO[bytes], file_slice), map_location="cpu"),
+                            )
+
+                            tensor = narrow_tensor_by_index(
+                                tensor, req.storage_offsets, req.lengths
+                            )
+
+                            tensor = tensor * self.one_minus_alpha
+
+                            target_tensor = planner.resolve_tensor(req).detach()
+
+                            
+
+                            if len(target_tensor) > 2:
+                                temp_target = target_tensor[:2] / self.alpha
+                                temp_og = tensor[:2] / self.one_minus_alpha
+                                print(f"{temp_target=}")
+                                print(f"{temp_og=}")
+
+                            tensor += target_tensor
+
+                            if len(target_tensor) > 2:
+                                print(f"interpolated: {tensor[:2]}")
+
+                            assert (
+                                target_tensor.size() == tensor.size()
+                            ), f"req {req.storage_index} mismatch sizes {target_tensor.size()} vs {tensor.size()}"
+
                             target_tensor.copy_(tensor)
                             planner.commit_tensor(req, target_tensor)
 
