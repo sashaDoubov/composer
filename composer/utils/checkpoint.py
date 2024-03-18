@@ -318,6 +318,8 @@ class FileSystemReader(dist_cp.FileSystemReader):
             print(f"plan0: {read_item=}")
             item_md = self.storage_data_1[read_item.storage_index]
             path = item_md.relative_path
+            print(f"item_md: {item_md=}")
+            print(f"{read_item.storage_index.fqn}")
             print(f"plan0: {path=}")
             per_file.setdefault(path, []).append(read_item)
 
