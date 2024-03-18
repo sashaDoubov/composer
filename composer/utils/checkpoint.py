@@ -310,6 +310,9 @@ class FileSystemReader(dist_cp.FileSystemReader):
             new_path = self.fs.concat_path(self.path1, relative_path)
             new_path2 = self.fs.concat_path(self.path2, relative_path)
 
+            print(f"{new_path=}")
+            print(f"{new_path2=}")
+
             with self.fs.create_stream(new_path, "rb") as stream:
                 with self.fs.create_stream(new_path2, "rb") as stream2:
                     # TODO sort by offset and cache the reading
