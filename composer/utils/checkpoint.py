@@ -323,6 +323,9 @@ class FileSystemReader(dist_cp.FileSystemReader):
                             read_bytes = io.BytesIO(file_slice.read(item_md.length))
                             read_bytes.seek(0)
                             planner.load_bytes(req, read_bytes)
+
+                            read_bytes = io.BytesIO(file_slice2.read(item_md.length))
+                            read_bytes.seek(0)
                         else:
                             tensor = cast(
                                 Tensor,
