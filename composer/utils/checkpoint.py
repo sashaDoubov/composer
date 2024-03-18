@@ -315,11 +315,11 @@ class FileSystemReader(dist_cp.FileSystemReader):
         # group requests by file
         per_file = dict()
         for read_item in plan[0].items:
-            # print(f"plan0: {read_item=}")
+            print(f"plan0: {read_item=}")
             item_md = self.storage_data_1[read_item.storage_index]
             path = item_md.relative_path
-            # print(f"item_md: {item_md=}")
-            # print(f"{read_item.storage_index.fqn}")
+            print(f"item_md: {item_md=}")
+            print(f"{read_item.storage_index.fqn}")
             per_file.setdefault(path, []).append(read_item)
 
         fqn_to_read_item2 = dict()
@@ -343,8 +343,12 @@ class FileSystemReader(dist_cp.FileSystemReader):
                 with self.fs.create_stream(new_path2, "rb") as stream2:
                     # TODO sort by offset and cache the reading
                     for req in reqs:
+                        print(f"{read_item.storage_index.fqn=}")
 
                         req2 = fqn_to_read_item2[req.storage_index.fqn]
+
+                        print(f"{req=}")
+                        print(f"{req2=}")
 
                         item_md = self.storage_data_1[req.storage_index]
                         item_md_2 = self.storage_data_2[req2.storage_index]
