@@ -494,7 +494,7 @@ class DistCPObjectStoreReader(FileSystemReader):
             local_rank_0 = dist.get_global_rank() - dist.get_local_rank()
 
             for plan_item in plan[0].items:
-                relative_file_path = self.storage_data[plan_item.storage_index].relative_path
+                relative_file_path = self.storage_data_1[plan_item.storage_index].relative_path
                 # Check if the file is scheduled to be downloaded by a lower rank on the same node
                 # i.e. if rank 0 and rank 1 on the same node have the same the same required file,
                 # only rank 0 should download it and not rank 1.
