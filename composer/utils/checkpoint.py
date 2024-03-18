@@ -314,9 +314,11 @@ class FileSystemReader(dist_cp.FileSystemReader):
     def read_data(self, plan, planner):
         # group requests by file
         per_file = dict()
-        for read_item in plan.items:
-            item_md = self.storage_data[read_item.storage_index]
+        for read_item in plan[0].items:
+            print(f"plan0: {read_item=}")
+            item_md = self.storage_data_1[read_item.storage_index]
             path = item_md.relative_path
+            print(f"plan0: {path=}")
             per_file.setdefault(path, []).append(read_item)
 
         log.debug(f"{self.path1=}")
