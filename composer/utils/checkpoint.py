@@ -341,8 +341,17 @@ class FileSystemReader(dist_cp.FileSystemReader):
                             tensor2 = narrow_tensor_by_index(
                                 tensor2, req.storage_offsets, req.lengths
                             )
+                            
+                            if len(tensor) > 2:
+                                print(f"{tensor[:2]=}")
+                                print(f"{tensor2[:2]=}")
+                                print(f"{self.alpha=}")
+                                print(f"{self.one_minus_alpha=}")
 
                             tensor = tensor * self.alpha + self.one_minus_alpha * tensor2 
+
+                            if len(tensor) > 2:
+                                print(f"{tensor[:2]=}")
 
                             target_tensor = planner.resolve_tensor(req).detach()
 
