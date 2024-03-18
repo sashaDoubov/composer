@@ -43,6 +43,7 @@ from torch.distributed._tensor import DeviceMesh
 from torch.distributed.checkpoint.metadata import Metadata
 from torch.distributed.checkpoint.optimizer import load_sharded_optimizer_state_dict
 from torch.distributed.checkpoint.planner import LoadPlan, LoadPlanner, LoadItemType
+from torch.distributed.checkpoint.default_planner import DefaultLoadPlanner, create_default_local_load_plan
 from torch.distributed._shard._utils import narrow_tensor_by_index
 from torch import Tensor
 
@@ -282,6 +283,15 @@ class FileSystem(FileSystemBase):
 
         return False
 
+
+class CustomPlanner(DefaultLoadPlanner):
+
+    def create_local_plan(self):
+        plan1 = create_default_local_load_plan(self.state_dict, self.metadata[0])
+        plan2 = create_default_local_load_plan(self.state_dict, self.metadata[1])
+
+        return plan1, plan2
+
 class FileSystemReader(dist_cp.FileSystemReader):
     def __init__(self, path1, path2, alpha, one_minus_alpha):
         self.fs = FileSystem()
@@ -385,7 +395,7 @@ class FileSystemReader(dist_cp.FileSystemReader):
         with self.fs.create_stream(path, "rb") as metadata_file:
             pickle2 = pickle.load(metadata_file)
 
-        return pickle1
+        return pickle1, pickle2
 
 # A subclass of FileSystemReaderWithValidation that downloads files from the object store before reading them from the local filesystem.
 class DistCPObjectStoreReader(FileSystemReader):
@@ -932,7 +942,7 @@ def load_sharded_checkpoint(
                 dist_cp.load(  # type: ignore
                     state_dict=state_dict,
                     storage_reader=storage_reader,
-                    planner=state.fsdp_config['load_planner'],
+                    planner=CustomPlanner(), #state.fsdp_config['load_planner'],
                     no_dist=(not dist.is_initialized()),
                 )
             else:
