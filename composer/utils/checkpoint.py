@@ -315,16 +315,17 @@ class FileSystemReader(dist_cp.FileSystemReader):
         # group requests by file
         per_file = dict()
         for read_item in plan[0].items:
-            print(f"plan0: {read_item=}")
+            # print(f"plan0: {read_item=}")
             item_md = self.storage_data_1[read_item.storage_index]
             path = item_md.relative_path
-            print(f"item_md: {item_md=}")
-            print(f"{read_item.storage_index.fqn}")
-            print(f"plan0: {path=}")
+            # print(f"item_md: {item_md=}")
+            # print(f"{read_item.storage_index.fqn}")
             per_file.setdefault(path, []).append(read_item)
 
-        log.debug(f"{self.path1=}")
-        log.debug(f"{self.path2=}")
+        fqn_to_read_item2 = dict()
+        for read_item in plan[1].items:
+            fqn_to_read_item2[read_item.storage_index.fqn] = read_item
+
 
         for relative_path, reqs in per_file.items():
 
@@ -342,18 +343,19 @@ class FileSystemReader(dist_cp.FileSystemReader):
                 with self.fs.create_stream(new_path2, "rb") as stream2:
                     # TODO sort by offset and cache the reading
                     for req in reqs:
-                        item_md = self.storage_data[req.storage_index]
+
+                        req2 = fqn_to_read_item2[req.storage_index.fqn]
+
+                        item_md = self.storage_data_1[req.storage_index]
+                        item_md_2 = self.storage_data_2[req2.storage_index]
 
                         file_slice = self._slice_file(stream, item_md)
-                        file_slice2 = self._slice_file(stream2, item_md)
+                        file_slice2 = self._slice_file(stream2, item_md_2)
 
                         if req.type == LoadItemType.BYTE_IO:
                             read_bytes = io.BytesIO(file_slice.read(item_md.length))
                             read_bytes.seek(0)
                             planner.load_bytes(req, read_bytes)
-
-                            read_bytes = io.BytesIO(file_slice2.read(item_md.length))
-                            read_bytes.seek(0)
                         else:
                             tensor = cast(
                                 Tensor,
@@ -370,7 +372,7 @@ class FileSystemReader(dist_cp.FileSystemReader):
                             )
 
                             tensor2 = narrow_tensor_by_index(
-                                tensor2, req.storage_offsets, req.lengths
+                                tensor2, req2.storage_offsets, req2.lengths
                             )
                             
                             if len(tensor) > 2:
