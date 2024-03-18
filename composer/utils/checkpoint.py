@@ -906,6 +906,7 @@ def load_sharded_checkpoint(
         with torch.no_grad():
             # 1. Load model and metadata first
             if load_weights_only:
+                print(f"loading weights only!!")
                 state_dict: Dict[str, Any] = {'state': {'model': state.get_model_state_dict()}}
             else:
                 cur_state_dict = state.state_dict()
