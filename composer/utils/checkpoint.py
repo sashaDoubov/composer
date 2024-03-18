@@ -483,7 +483,7 @@ class DistCPObjectStoreReader(FileSystemReader):
         # 1. Collect the relative paths to download for all ranks for deduplication
         relative_file_paths = set()
         for plan_item in plan[0].items:
-            relative_file_paths.add(self.storage_data[plan_item.storage_index].relative_path)
+            relative_file_paths.add(self.storage_data_1[plan_item.storage_index].relative_path)
         all_file_paths = dist.all_gather_object(relative_file_paths)
 
         # 2. Download to the destination all files this rank needs if on first replica
