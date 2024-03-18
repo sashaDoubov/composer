@@ -495,7 +495,7 @@ class DistCPObjectStoreReader(FileSystemReader):
                 # The file could have already been downloaded as different plan items can point to same file.
                 if not is_downloaded and not os.path.exists(file_destination):
                     log.debug(f'Downloading {relative_file_path} to {file_destination}.')
-                    object_name = str(Path(self.source_path) / Path(relative_file_path))
+                    object_name = str(Path(self.second_load_path) / Path(relative_file_path))
                     if isinstance(self.object_store, ObjectStore):
                         self.object_store.download_object(
                             object_name=object_name,
