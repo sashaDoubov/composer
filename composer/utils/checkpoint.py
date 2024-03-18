@@ -313,6 +313,10 @@ class FileSystemReader(dist_cp.FileSystemReader):
             print(f"{new_path=}")
             print(f"{new_path2=}")
 
+            # Print the file size
+            print(f"The size of {new_path} is: {new_path.stat().st_size} bytes")
+            print(f"The size of {new_path2} is: {new_path2.stat().st_size} bytes")
+
             with self.fs.create_stream(new_path, "rb") as stream:
                 with self.fs.create_stream(new_path2, "rb") as stream2:
                     # TODO sort by offset and cache the reading
