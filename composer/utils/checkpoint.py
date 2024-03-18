@@ -299,7 +299,8 @@ class FileSystemReader(dist_cp.FileSystemReader):
         self.path2 = self.fs.init_path(path2)
         self.alpha = alpha
         self.one_minus_alpha = one_minus_alpha
-        self.storage_data = dict()
+        self.storage_data_1 = dict()
+        self.storage_data_2 = dict()
 
     def set_up_storage_reader(self, metadata, is_coordinator):
         self.storage_data_1 = metadata[0].storage_data
