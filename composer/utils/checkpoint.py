@@ -399,6 +399,9 @@ class DistCPObjectStoreReader(FileSystemReader):
         self.mix_alpha = mix_alpha,
         self.mix_1_minus_alpha = mix_1_minus_alpha
 
+        print(f"{self.source_path=}")
+        print(f"{self.second_load_path=}")
+
         self.destination_path_1 = str(Path(self.destination_path) / Path('chkpt_1'))
         self.destination_path_2 = str(Path(self.destination_path) / Path('chkpt_2'))
 
