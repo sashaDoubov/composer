@@ -301,6 +301,12 @@ class FileSystemReader(dist_cp.FileSystemReader):
         self.one_minus_alpha = one_minus_alpha
         self.storage_data = dict()
 
+    def set_up_storage_reader(self, metadata, is_coordinator):
+        self.storage_data_1 = metadata[0].storage_data
+        self.storage_data_2 = metadata[1].storage_data
+        assert self.storage_data_1 is not None
+        assert self.storage_data_2 is not None
+
     def _slice_file(self, file, sinfo):
         return _create_file_view(file, sinfo.offset, sinfo.length)
 
